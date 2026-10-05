@@ -119,19 +119,63 @@ $ python app.py ask '...'
 
 **The three tools, tested one at a time**
 
+`search_listings`, a query that matches (6 results; the first two shown in full, the other four trimmed to id / title / size / price):
+
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'description': 'Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.', 'category': 'tops', 'style_tags': ['y2k', 'vintage', 'graphic tee', 'cottagecore'], 'size': 'S/M', 'condition': 'excellent', 'price': 18.0, 'colors': ['white', 'pink', 'purple'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'description': 'Vintage-style bootleg tee with faded graphic. Slightly boxy fit. 100% cotton, soft and worn-in.', 'category': 'tops', 'style_tags': ['graphic tee', 'vintage', 'grunge', 'streetwear', 'band tee'], 'size': 'L', 'condition': 'good', 'price': 24.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, ...]
+  ... lst_017 Mesh Long-Sleeve Top — Black (S/M, $15.0)
+  ... lst_033 Vintage Band Tee — Faded Grey (L, $19.0)
+  ... lst_011 Low-Rise Cargo Pants — Khaki (W29, $27.0)
+  ... lst_015 Vintage Graphic Hoodie — Faded Black (L, $26.0)
 ```
 
-```
-$ python -c "from tools import suggest_outfit; ..."
+`search_listings`, the empty case (returns an empty list, not None):
 
 ```
+$ python -c "from tools import search_listings; print(search_listings('ballgown', size='XXS', max_price=5))"
+[]
+```
+
+`suggest_outfit`, with the example wardrobe:
 
 ```
-$ python -c "from tools import create_fit_card; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Here are two effortless, everyday outfits built around your new vintage Levi’s 501s and pieces you already own:
 
+**1. The Off-Duty Cool Look**
+*   **Top:** White ribbed tank top
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag, Brown leather belt
+*   **Why it works:** Tuck the white ribbed tank into the 501s, cinch it with the brown leather belt, and layer the vintage black denim jacket on top. Finish with chunky white sneakers and the black crossbody bag for an effortless, high-contrast 90s-inspired street style.
+
+**2. The Cozy & Edgy Look**
+*   **Top:** Oversized grey crewneck sweatshirt (or layer the Black cropped zip hoodie over the White ribbed tank top)
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt, Black crossbody bag
+*   **Why it works:** Pair the medium wash 501s with the oversized grey crewneck for a relaxed silhouette. Cinch the waist with the brown leather belt to add shape, and ground the look with black combat boots and the black crossbody bag for a cool, grungy edge.
+```
+
+`suggest_outfit`, the empty-wardrobe case (general advice instead of a crash; trimmed):
+
+```
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_empty_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_empty_wardrobe()))"
+Vintage Levi’s 501s in a medium wash are the ultimate wardrobe holy grail—they are timeless, incredibly versatile, and the light knee-fading gives them that effortless, "broken-in" feel right out of the box.
+
+Here are two distinct, practical ways to style these jeans:
+
+### Outfit 1: The Parisian-Chic Casual (Effortless & Elevated)
+* **Top:** A fitted, long-sleeve black-and-white striped Breton tee, slightly tucked in to highlight the waist of the 501s.
+* **Footwear:** Pointed-toe black leather ankle boots (which peek out neatly from the hem) or classic black leather ballet flats.
+...
+```
+
+`create_fit_card`:
+
+```
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Still not over finding these vintage Levi's 501 jeans for just $38 on depop. Threw them on with my beat-up white sneakers and a simple tee for the ultimate effortless 90s coffee run fit. Nothing beats breaking in a real pair of vintage denim.
 ```
 
 ---
