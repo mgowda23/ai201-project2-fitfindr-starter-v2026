@@ -21,28 +21,30 @@ data earns credit; *"80% seemed reasonable"* does not.
 
 ## 1. A matching query completes all three tools
 
-Given a query that matches at least one listing, the agent completes all three
-tool calls and returns a fit card — in at least 4 of 5 tries.
+Given a query that matches at least one listing, the agent completes all three tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
 <!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
      "my search is a plain keyword match and some phrasings will miss" is a
      real answer. -->
 
+The search should be good enough to find at least one real listing most of the time, but not perfect. The listing data is limited and some user phrasing will miss the exact wording in the dataset, so a 4 of 5 target is realistic while still meaning the agent is doing the main flow correctly.
+
 ---
 
 ## 2. An impossible query stops before the second tool
 
-Given a query that matches no listings, the agent stops before calling
-`suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
+Given a query that matches no listings, the agent stops before calling `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
 <!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
      about this path? -->
 
+This path is much easier to control than the matching-query path because the search has no valid result to work with. The branch should always terminate cleanly and explain whether the user should change the description, size, or price limit, so a 5 of 5 target is appropriate here.
+
 ---
 
-## 3. Something about state
+## 3. The selected item is the same one that reaches the next tool
 
 <!-- YOU WRITE THIS ONE.
 
@@ -54,15 +56,15 @@ Given a query that matches no listings, the agent stops before calling
      compares session["selected_item"] against what actually reached
      suggest_outfit is the shape you're after. -->
 
-
+Given a query that matches at least one listing, the item stored in `session["selected_item"]` is the same listing passed into `suggest_outfit`, and the ID matches in at least 5 of 5 tries.
 
 **Why this target:**
 
-
+The item moves through a plain dict, with no model call between the search and the next tool, and the query is parsed with regex, so the same query always selects the same item. Nothing random happens on this path, which means a single mismatch would be a bug in the loop rather than noise. That's why the target is 5 of 5 and not 4 of 5.
 
 ---
 
-## 4. Something about the fit card
+## 4. The fit card mentions the item details and varies by item
 
 <!-- YOU WRITE THIS ONE.
 
@@ -75,15 +77,15 @@ Given a query that matches no listings, the agent stops before calling
      sentence? A card longer than a caption anyone would post? Any of those can
      be turned into a number. -->
 
-
+Given five different matching listings, the fit card mentions the item price and platform in at least 4 of 5 tries, and the fit cards do not reuse the same opening sentence in at least 4 of 5 tries.
 
 **Why this target:**
 
-
+A fit card is not just a model response — it has to read like a real caption. If it omits the price or platform, it reads like a generic description. If the first sentence is identical across different items, it is acting like a template instead of a real post.
 
 ---
 
-## 5. Your choice
+## 5. An empty wardrobe still produces styling advice
 
 <!-- YOU WRITE THIS ONE TOO.
 
@@ -92,11 +94,11 @@ Given a query that matches no listings, the agent stops before calling
      search respects a price ceiling — anything, as long as it names a number
      or an observable outcome. -->
 
-
+Given a user with an empty wardrobe, `suggest_outfit` still returns a non-empty styling suggestion in 5 of 5 tries.
 
 **Why this target:**
 
-
+The empty-wardrobe path is a real user behavior in this project, and the starter explicitly says to handle it instead of crashing or returning an empty string. This is a simple and reliable check that the tool still works when the wardrobe has no saved items.
 
 ---
 
