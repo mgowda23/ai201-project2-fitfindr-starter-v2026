@@ -97,9 +97,9 @@
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex, in `agent.py::parse_query`. "$30", "under $30" or "below $25" becomes `max_price`. "size M", "size US 9", "size W30", or a trailing ", M" becomes `size`. Whatever is left becomes `description`. Size has to come after "size" or a trailing comma, so "medium wash jeans" doesn't get parsed as size M. I chose regex because it's free and gives the same answer every time. The trade-off: "under thirty dollars" isn't recognized, so no price ceiling is set and those words stay in the description.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` → `parsed` (description, size, max_price) → `search_results` → `selected_item` (the first result) → `outfit_suggestion` → `fit_card`. If the search comes back empty, `error` gets set and `selected_item`, `outfit_suggestion` and `fit_card` all stay `None`.
 
 ---
 
@@ -113,8 +113,40 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
+  Outfit:   Here are two effortless ways to style your new Y2K butterfly baby tee using pieces from your wardrobe:
+
+**Outfit 1: High-Contrast Y2K Streetwear**
+*   **Top:** Y2K Baby Tee — Butterfly Print
+*   **Bottoms:** Baggy straight-leg jeans, dark wash
+*   **Outerwear:** Vintage black denim jacket (worn off the shoulders for that true 2000s vibe)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+*   *Why it works:* The fitted, cropped silhouette of the baby tee balances out the voluminous dark wash jeans, while the black denim jacket and white sneakers tie the whole cool, casual look together.
+
+**Outfit 2: Elevated Model-Off-Duty**
+*   **Top:** Y2K Baby Tee — Butterfly Print
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Accessories:** Brown leather belt + Black crossbody bag
+*   **Shoes:** Black combat boots
+*   *Why it works:* Pairing the ultra-feminine, pink-and-purple butterfly tee with structured khaki trousers creates a great high-low mix. Cinch the trousers with your brown leather belt and anchor the outfit with the black combat boots for a slightly edgy finish.
+
+  Fit card: Found this adorable butterfly baby tee for just $18 on Depop and I'm obsessed with the print. I've been living for the Y2K streetwear vibe lately, so styling it with baggy dark wash jeans and an off-the-shoulder vintage jacket is my new go-to. It also looks super cool dressed down with wide-leg trousers and combat boots for that effortless model-off-duty look!
+
+0 model calls this session, 2 served from cache
+```
+
+**The empty path** (stops before `suggest_outfit`; `fit_card` stays `None`):
+
+```
+$ python agent.py
+...
+=== A query it can't ===
+  stopped: Nothing in the listings matched description 'designer ballgown', size XXS, under $5.
+Things to change: try broader words — 'jacket' finds more than 'cropped corduroy jacket'; drop the size, or try a neighbouring one; raise the price ceiling above $5.
+  fit_card is None — it should still be None here
 ```
 
 **The three tools, tested one at a time**
@@ -191,15 +223,15 @@ Still not over finding these vintage Levi's 501 jeans for just $38 on depop. Thr
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked an AI assistant to explain the code in `agent.py` so I could understand what `run_agent` needed to do before writing it myself.
+- *What came back:* It didn't just explain. It went ahead and rewrote `agent.py`, adding `parse_query`, the branch, and `_nothing_found_message`. It also added code from the next unit: a `_search()` function that called `search_listings` over MCP and silently fell back to the local function, a `try/except ModelUnavailable` block, and trace labels saying "search_listings (via MCP)". My `mcp_server.py` doesn't register any tool yet, so every run quietly fell back, and the trace said MCP was being used when it wasn't. Its docstrings even said "In unit 3 this function does not exist."
+- *What I changed:* I deleted `_search()` and made `run_agent` call `search_listings(parsed["description"], parsed["size"], parsed["max_price"])` directly. I also removed the MCP trace labels and the Unit 4 `try/except`. Then I read through `parse_query` and `run_agent` line by line and reran both paths to check that the branch and the session still worked.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude to review my uncommitted work and help me split it into one commit per milestone.
+- *What came back:* It found that my Tool Inventory said `create_fit_card` mentions "brand, size, and price", but my code asks the model for the price and the platform. Brand is `None` for most listings, so the spec promised something the data often can't give. It also pointed out that my criterion 3 (state) targeted 4 of 5 without saying why it wasn't stricter.
+- *What I changed:* I rewrote the `create_fit_card` spec to say the caption mentions the item, its price and its platform once each, and I added the listing fields to the `search_listings` return line. I also changed criterion 3 to 5 of 5, because the item passes through a dict with no model call in between, so any mismatch would be a bug rather than noise.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
