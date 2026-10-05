@@ -59,24 +59,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Searches the listing data for matches to a description, with optional size and price filters
+- **Inputs:** 'description' (str), 'size' (str or None), 'max_price' (float or None)
+- **Returns:** A list of listing dicts, each with id, title, description, category, style_tags, size, condition, price, colors, brand, platform. Best keyword match first, at most SEARCH_RESULT_LIMIT. Size matches whole size tokens ("M" matches "S/M", "S" does not match "US 9"); "One Size" always matches.
+- **When it has nothing:** Returns an empty list []
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Suggests outfit combinations for a chosen item using the user’s wardrobe when available.
+- **Inputs:** `new_item` (dict, one listing from search_listings), `wardrobe` (dict with an "items" list, which may be empty)
+- **Returns:** A non-empty string with outfit suggestions.
+- **When it has nothing:** Returns general styling advice when the wardrobe is empty.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Writes a 2–4 sentence social-media caption for the item and outfit, mentioning the item, its price and its platform once each.
+- **Inputs:** 'outfit' (str), 'new_item' (dict)
+- **Returns:** A string caption with the item and outfit details of 2-4 sentences.
+- **When it has nothing:** If `outfit` is empty or whitespace, returns a fallback caption built from the title, price and platform, without calling the model.
 
 ---
 
@@ -93,7 +93,7 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If search_listings returns an empty list, put a message in session["error"] naming what the user could change (description, size, or price) and stop without calling suggest_outfit. Otherwise take the first result, put it in session["selected_item"], and go to suggest_outfit.
 
 **Where it lives:** `agent.py::run_agent`
 
