@@ -251,19 +251,92 @@ Still not over finding these vintage Levi's 501 jeans for just $38 on depop. Thr
      `python run_eval.py --label before` runs everything and writes the table
      into results/. Paste it here and fill in the verdicts. -->
 
+Full output: [results/run_2026-10-07_2144_before.md](results/run_2026-10-07_2144_before.md), from `python run_eval.py --label before` (cache off, temperature 0.9, 9 scenarios × 5 tries, 80 model calls).
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item is the one the next tools receive | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card names price + platform; no reused opening across items | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe still gets styling advice | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+**How I scored each try:**
+1. PASS if the run wasn't stopped early, the trace shows all five steps, and `fit_card` is non-empty.
+2. PASS if the run stopped early, the trace ends at `branch` with no `suggest_outfit` step, and the message names what to change.
+3. PASS if the title in `select_item`'s output equals the title `suggest_outfit` received, and `create_fit_card` received the same `lst_` id.
+4. Criterion 4 is about five *different* items, so it has five scenarios (items A–E: lst_002, lst_022, lst_011, lst_007, lst_013). Try N in this row is Try 1 of item N. A try PASSES if the card contains the price and the platform, and its first sentence isn't used by any of the other four cards.
+5. PASS if `outfit_suggestion` is non-empty with the empty wardrobe and nothing crashed.
+
+**Real output from one try per criterion**
+
+Criterion 1, Try 1: `agent.py::run_agent` → fit card from `tools.py::create_fit_card`:
 
 ```
+query: vintage graphic tee under $30   (example wardrobe)
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+Fit card:
+Still lowkey obsessed I found this Y2K butterfly baby tee for just $18 on Depop. It’s so easy to dress down with baggy dark denim and chunky sneakers, or totally flip the vibe by pairing it with wide-leg trousers and combat boots. Such an effortless little piece to throw on when you don't know what to wear. ✨
+```
 
+Criterion 2, Try 1: the branch in `agent.py::run_agent`, message from `agent.py::_nothing_found_message`:
+
+```
+- stopped early: yes — Nothing in the listings matched description 'designer ballgown', size XXS, under $5.
+Things to change: try broader words — 'jacket' finds more than 'cropped corduroy jacket'; drop the size, or try a neighbouring one; raise the price ceiling above $5.
+- selected_item: (none)
+- search_results: 0
+
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+[2] search_listings (via MCP)
+      in:  {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+      out: [] (empty)
+      →    0 match(es)
+[3] branch
+      →    search returned [] so stopping early
+```
+
+Criterion 3, Try 1: trace from `agent.py::run_agent` (same item at steps 3, 4 and 5):
+
+```
+[3] select_item
+      in:  6 items: 90s Leather Bomber — Black, 90s Track Jacket — Navy/White Stripe, Leather Belt — Brown, Braided … +3 more
+      out: 90s Leather Bomber — Black ($75.0, depop)
+[4] suggest_outfit
+      in:  90s Leather Bomber — Black ($75.0, depop)
+      out: Here are two effortless, grunge-meets-minimalist outfits built around your new 90s leather bomber and items fr…
+      →    10 wardrobe item(s)
+[5] create_fit_card
+      in:  item lst_022 + outfit: Here are two effortless, grunge-meets-minimalist outfits built around your new 90s leat…
+      out: Scored this vintage 90s leather bomber on Depop for $75 and I am never taking it off. It has that perfect boxy…
+```
+
+Criterion 4, Try 1 of each item: `tools.py::create_fit_card`:
+
+```
+A lst_002: Scored this vintage butterfly baby tee for just $18 on Depop and I'm obsessed with the early 2000s nostalgic vibe. ... Go grab it on my shop before I change my mind and keep it for myself!🦋✨
+B lst_022: Found my ultimate fall jacket—this vintage 90s leather bomber was an absolute steal for $75 on Depop. ...
+C lst_011: Scored these khaki low-rise cargos on Poshmark for just $27 and I’m so obsessed with the Y2K utilitarian vibe. ...
+D lst_007: Score this light wash cropped denim jacket for just $42 on Poshmark and honestly, I’m obsessed. ...
+E lst_013: Found this vintage 90s floral silk slip dress on Depop for just $30 and I'm obsessed with the print. ...
+```
+
+Criterion 5, Try 1: `tools.py::suggest_outfit` with an empty wardrobe:
+
+```
+query: denim jacket under $50   (empty wardrobe)
+Outfit suggestion:
+Here are two stylish, versatile ways to style this cropped light-wash denim jacket, playing up its structured shoulders and vintage feel:
+
+### Look 1: The Modern Prep & Play
+*A fresh, textural mix that balances the ruggedness of denim with refined, polished pieces.*
+
+*   **Top:** A crisp white poplin button-down shirt, worn untucked so the longer hem peaks out beneath the cropped jacket for a cool, layered proportion play.
+*   **Bottoms:** Pleated, wide-leg trousers in a rich camel or chocolate brown to anchor the light blue wash.
+...
 ```
 
 ---
