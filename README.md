@@ -361,13 +361,23 @@ Here are two stylish, versatile ways to style this cropped light-wash denim jack
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | MET (5/5) | All five tries reached `create_fit_card` and returned a non-empty fit card; every trace has 5 steps. |
+| 2 | Impossible query stops before `suggest_outfit` | 5 of 5 | MET (5/5) | All five traces end at `[3] branch` with no `suggest_outfit` step, and the message names the description, the size and the price to change. |
+| 3 | Selected item is the one the next tools receive | 5 of 5 | MET (5/5) | In all five traces, `select_item` output, `suggest_outfit` input and `create_fit_card` input are the same item (90s Leather Bomber, `lst_022`). |
+| 4 | Fit card names price + platform; no reused opening across items | 4 of 5 | MET (5/5) | All five item cards (Try 1 of A–E) contain the price and the platform, and no two share a first sentence. |
+| 4 (revised) | Fit card names price + platform and presents the user as the buyer, all 5 items | 5 of 5 | **MISSED (4/5)** | Scored over all 25 item cards (5 items × 5 tries). Try 1 failed: item A's card ends "Go grab it on my shop before I change my mind". Tries 2–5 had no seller wording on any item. |
+| 5 | Empty wardrobe still gets styling advice | 5 of 5 | MET (5/5) | `outfit_suggestion` was non-empty in all five tries (1,731–2,312 characters of general advice), with no crash. |
 
 **Diagnoses**
+
+**Every original criterion was met, and I think some targets were too low.** Criterion 1 at 4 of 5 could never realistically miss: `search_listings` is a deterministic keyword match over a fixed file, and the parser is regex, so the same query finds the same item every time. The only real risk in that path is the model being unreachable, which is a separate failure mode. If I rewrote it, it would be 5 of 5. Criterion 4 was the weakest: it passed while the run showed a real problem, so I revised it in `criteria.md` (original left in place).
+
+**Criterion 4 (revised): MISSED, 4/5. Place: the model's output, from `tools.py::create_fit_card`. The prompt allows it.**
+The search, the branch and the session all worked. Every seller-worded card received the right item and the right outfit (criterion 3 shows the item reaching `create_fit_card` intact). The problem is the prompt. It tells the model to "sound like a real person posting a thrift find" and to "mention the item, price, and platform once each", but it never says *who* the person is relative to the item. Depop and Poshmark are both resale marketplaces, so "item + price + platform" is also exactly what a sales listing contains, and at temperature 0.9 the model sometimes writes one: "Finally found the ultimate Y2K butterfly baby tee and listed it on Depop for just $18!" (matching-query Try 4) and "Go grab it on my shop before I change my mind" (item A Try 1).
+
+The pattern: both misses in the eval are the same listing, `lst_002` on Depop. The two seller captions I saw in earlier manual runs ("debating if I should keep them or list them on my Depop shop" for `lst_001`, and "over on my Depop shop" for `lst_002` again, with the empty wardrobe) were also Depop items. That's 4 seller captions in total, all Depop and none Poshmark, though 25 of the 40 eval cards were Depop and 15 Poshmark, so the Poshmark sample is smaller. It's one problem, not four: the prompt leaves the poster's role open, and the platform name pulls toward listing language.
+
+**Not a criterion miss, but found while testing:** the captions are heavily templated. 35 of 40 contain "for just $", 27 of 40 say "obsessed", and 23 of 40 start with "Found" or "Still". None of my criteria measure this, and I'm not counting it as a miss. It's noted in What's Still Broken.
 
 
 

@@ -83,6 +83,10 @@ Given five different matching listings, the fit card mentions the item price and
 
 A fit card is not just a model response — it has to read like a real caption. If it omits the price or platform, it reads like a generic description. If the first sentence is identical across different items, it is acting like a template instead of a real post.
 
+> **Revised in unit 4:** For 5 different items, every fit card names the price and the platform **and presents the user as the buyer**. It never says they listed, are selling, or have a shop for the item. A try passes only if all five items' cards pass. Target: 5 of 5 tries.
+>
+> **Why revised:** The original measured the wrong thing. "No reused opening sentence" could practically never fail, because every first sentence contains the item's own name, so two cards are never word-for-word identical. It passed 5/5 while missing the real defect in the run: 2 of 40 cards said "listed it on Depop for just $18" or "Go grab it on my shop before I change my mind". That turns a buyer's post into a sales listing, which is factually wrong about the user, not just a style choice. The new check is something I can score per card by reading it. The target is 5 of 5 because a caption that misstates who owns the item shouldn't be posted at all.
+
 ---
 
 ## 5. An empty wardrobe still produces styling advice
