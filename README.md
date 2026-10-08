@@ -312,22 +312,104 @@ that produced it:
      the same length, your branch isn't working — and this is the fastest way
      anyone will ever find that out. -->
 
-**Happy path**
+**Happy path** (5 steps; `search_listings` runs through MCP)
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
+[2] search_listings (via MCP)
+      in:  {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    10 match(es)
+[3] select_item
+      in:  10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[4] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: Here are two effortless ways to style your new Y2K butterfly baby tee using pieces from your wardrobe:  **Outf…
+      →    10 wardrobe item(s)
+[5] create_fit_card
+      in:  item lst_002 + outfit: Here are two effortless ways to style your new Y2K butterfly baby tee using pieces from…
+      out: Found this adorable butterfly baby tee for just $18 on Depop and I'm obsessed with the print. I've been living…
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+  ...
+  Fit card: Found this adorable butterfly baby tee for just $18 on Depop and I'm obsessed with the print. I've been living for the Y2K streetwear vibe lately, so styling it with baggy dark wash jeans and an off-the-shoulder vintage jacket is my new go-to. It also looks super cool dressed down with wide-leg trousers and combat boots for that effortless model-off-duty look!
 ```
 
-**Empty search**
+**Empty search** (3 steps; stops at the branch, so `suggest_outfit` and `create_fit_card` never run)
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+[2] search_listings (via MCP)
+      in:  {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+      out: [] (empty)
+      →    0 match(es)
+[3] branch
+      →    search returned [] so stopping early
 
+  Nothing in the listings matched description 'designer ballgown', size XXS, under $5.
+Things to change: try broader words — 'jacket' finds more than 'cropped corduroy jacket'; drop the size, or try a neighbouring one; raise the price ceiling above $5.
+
+0 model calls this session
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** I registered `search_listings` in `mcp_server.py` with `@mcp.tool()`, keeping the same inputs as my Tool Inventory (`description` str, `size` str or None, `max_price` float or None); `python mcp_client.py` lists it with those three inputs. In `agent.py::run_agent` I replaced the direct `search_listings(...)` call with `call_tool("search_listings", {...})`. Nothing behaved differently afterwards: for `'graphic tee'` under $30, the MCP call returned the same 6 listing dicts as the direct call (compared with `==`, result `True`), and the impossible query still returns `[]` through MCP, so the branch didn't need to change.
+
+### Failure modes, triggered on purpose
+
+**1. Empty search.** Handled from the start by the branch in `agent.py::run_agent` (see the empty-search trace above). It stops before `suggest_outfit` and names the three things to change.
+
+**2. Empty wardrobe.** Handled from the start by `tools.py::suggest_outfit`, which switches to a general-advice prompt when `wardrobe["items"]` is empty. No crash, and no empty string:
+
+```
+$ python app.py ask 'vintage graphic tee under $30' --empty-wardrobe
+(running with an empty wardrobe)
+...
+[4] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: Here are two stylish, trend-forward ways to style this Y2K butterfly baby tee:  ### Look 1: The Off-Duty Model…
+      →    0 wardrobe item(s)
+...
+  Outfit:   Here are two stylish, trend-forward ways to style this Y2K butterfly baby tee:
+
+### Look 1: The Off-Duty Model (Casual & Edgy)
+*Balance the sweet, feminine energy of the butterfly print with relaxed, utilitarian bottoms.*
+* **Bottoms:** Low-rise, wide-leg cargo pants in a neutral shade like khaki, olive green, or grey.
+...
+```
+
+**3. Model unavailable.** This one was **not** handled. With one character removed from the key in `.env`, `run_agent` had no `try/except`, so the exception escaped the loop. `app.py`'s catch-all printed it as one line, and the search results (6 listings) were lost:
+
+```
+$ AI201_CACHE=0 python app.py ask 'black leather jacket size M'
+...
+[3] selected_item
+      out: {'id': 'lst_022', 'title': '90s Leather Bomber — Black', ...
+
+ModelUnavailable: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+```
+
+Run directly as `python agent.py`, it would have been a full traceback, because nothing in the agent caught it. I wrapped the `suggest_outfit` and `create_fit_card` calls in `agent.py::run_agent` in `try / except ModelUnavailable`. The handler sets `session["error"]`, keeps the search results, and leaves `fit_card` as `None`. Same command, after:
+
+```
+$ AI201_CACHE=0 python app.py ask 'black leather jacket size M' --trace
+...
+[3] select_item
+      out: 90s Leather Bomber — Black ($75.0, depop)
+[4] model unavailable
+      →    stopping; search results kept in the session
+
+  The model couldn't be reached, so the outfit and caption steps didn't run.
+The search still worked: 6 listing(s) found, best match 90s Leather Bomber — Black ($75.0 on depop).
+What to try: check GEMINI_API_KEY in your .env (run `python test.py` to confirm it works), then run the same query again.
+What the service said: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+```
 
 
 
