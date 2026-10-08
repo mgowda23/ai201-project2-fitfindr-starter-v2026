@@ -233,6 +233,18 @@ Still not over finding these vintage Levi's 501 jeans for just $38 on depop. Thr
 - *What came back:* It found that my Tool Inventory said `create_fit_card` mentions "brand, size, and price", but my code asks the model for the price and the platform. Brand is `None` for most listings, so the spec promised something the data often can't give. It also pointed out that my criterion 3 (state) targeted 4 of 5 without saying why it wasn't stricter.
 - *What I changed:* I rewrote the `create_fit_card` spec to say the caption mentions the item, its price and its platform once each, and I added the listing fields to the `search_listings` return line. I also changed criterion 3 to 5 of 5, because the item passes through a dict with no model call in between, so any mismatch would be a bug rather than noise.
 
+**Moment 3 (unit 4)**
+
+- *What I asked for:* After breaking my API key on purpose, I asked Claude to add the model-unavailable handler and fix my trace.
+- *What came back:* A `try / except ModelUnavailable` around `suggest_outfit` and `create_fit_card` in `run_agent`, which keeps the search results and says what broke and what to try. It also pointed out that my `trace.step()` calls wrapped everything in `str()`, which turned off `trace.py`'s own formatting, so a list of listings showed as cut-off raw dict text instead of "10 items: Y2K Baby Tee…, …".
+- *What I changed / checked:* I reran the same query with the broken key and confirmed the new message replaced the one-line `ModelUnavailable:` error. Then I restored the key and checked `python test.py` passed. One part of the trace advice didn't hold up: passing the small `parsed` dict raw made the trace show only "dict with keys: description, size, max_price", which hid the values, so that one stays a string.
+
+**Moment 4 (unit 4)**
+
+- *What I asked for:* My before run met all five criteria, and I asked Claude what to do in Milestone 4 when nothing missed.
+- *What came back:* It counted patterns across all 40 fit cards and found 2 that made me sound like the seller ("listed it on Depop", "grab it on my shop"). My criterion 4 couldn't catch this, because first sentences contain the item's name and are never word-for-word identical. It suggested revising criterion 4 (keeping the original), then fixing the `create_fit_card` prompt as the one improvement.
+- *What I changed:* I revised criterion 4 under the original in `criteria.md`, and changed the prompt to say the poster is the buyer. The after run showed something the suggestion didn't predict: the captions got more repetitive (36 of 40 now start with "Scored"), which I reported as a side effect instead of hiding it. The first two after runs were also ruined by a Gemini 503 outage. I didn't score those, and only reran once the model answered 6 calls in a row.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -565,6 +577,18 @@ It fixed the problem it targeted, but it made the captions more repetitive, and 
 <!-- For each criterion still missed: what you'd do, and why you stopped where
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
+
+No criterion is missed in the after run. All five, plus revised criterion 4, are MET (5/5). That doesn't mean nothing is broken. These are the problems I found while testing that my criteria don't catch, or only just catch:
+
+**1. The fit cards are templated, and my fix made it worse.** After the improvement, 36 of 40 captions open with "Scored", 30 of 40 say "obsessed", and 29 of 40 contain "for just $". Two cards for the same item even share an identical first sentence. *What I'd do:* first add a criterion that can measure this, e.g. "across 5 items, no two captions share their first three words". Then change the prompt to ask for a varied opening, or give it the outfit's vibe to open with instead of the purchase. *Why I stopped:* the unit allows one improvement, and I spent it on the seller wording because that one is factually wrong about the user, while repetitive wording is only a style problem.
+
+**2. Seller wording might not be fully gone.** 0 of 40 after vs 2 of 40 before is encouraging, but with a 5% starting rate, a clean run of 40 would still happen about 13% of the time by chance. *What I'd do:* run `python run_eval.py --label after --tries 10` a few times and count seller cards across all of them. *Why I stopped:* each run is about 80 model calls, and Gemini was in an outage for most of the afternoon.
+
+**3. `search_listings` matches on a single shared word.** "corduroy jacket" returns a 90s Track Jacket (no corduroy) as its top result, and "mini skirt" returns a Mini Shoulder Bag, because the score is just the count of overlapping keywords, and one shared word ("jacket", "mini") is enough. My criteria only check that a match comes back, not that it's the right kind of item. *What I'd do:* require the category word (jacket, skirt, pants…) to match the listing's `category`, or weight title matches above description matches. *Why I stopped:* it didn't cause any criterion to miss, and changing search would have been a second change in this unit.
+
+**4. The query parser only understands "$" prices.** "tee under thirty dollars" sets no price ceiling, and "under thirty dollars" stays in the description as search words. *What I'd do:* add number words and "dollars" to `_PRICE_RE` in `agent.py::parse_query`, or fall back to asking the model when the regex finds no price. *Why I stopped:* none of my scenarios use written-out prices, so it never showed up in the run log. It's a known gap I wrote down in Unit 3.
+
+**5. A model outage stops the run instead of retrying.** During the Gemini 503 outage, 28 of 40 tries in one run stopped at the model step. The handler did its job, with a clear message, kept search results and no crash. But `generate.py` only retries rate-limit errors (429), not "high demand" errors (503), so one failed call ends the whole run. *What I'd do:* treat 503 like a rate limit and retry with backoff a couple of times before giving up. *Why I stopped:* retrying is a change to the starter's model adapter, and the unit allows only one change to the system.
 
 
 
