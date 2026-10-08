@@ -16,7 +16,8 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from mcp_client import call_tool
+from tools import suggest_outfit, create_fit_card
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -123,33 +124,42 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     trace.check_iterations(steps)
     parsed = parse_query(query)
     session["parsed"] = parsed
+    trace.step("parsed_query", inputs = query, returned = str(parsed))
 
     steps += 1
     trace.check_iterations(steps)
-    results = search_listings(
-        parsed["description"], parsed["size"], parsed["max_price"]
-    )
+    results = call_tool("search_listings", {
+        "description": parsed["description"],
+        "size": parsed["size"],
+        "max_price": parsed["max_price"],
+    })
     session["search_results"] = results
+    trace.step("search_listings VIA MCP", inputs = str(parsed), returned = str(results), 
+               note=f"search_listings VIA MCP returned {len(results)} match(es)")
 
     if not results:
         session["error"] = _nothing_found_message(parsed)
+        trace.step("branch", note="search returned [] so stopping early")
         return session
 
     steps += 1
     trace.check_iterations(steps)
     session["selected_item"] = results[0]
+    trace.step("selected_item", inputs = str(results), returned = str(session["selected_item"]))
 
     steps += 1
     trace.check_iterations(steps)
     session["outfit_suggestion"] = suggest_outfit(
         session["selected_item"], session["wardrobe"]
     )
+    trace.step("suggest_outfit", inputs = str(session["selected_item"]), returned = str(session["outfit_suggestion"]))
 
     steps += 1
     trace.check_iterations(steps)
     session["fit_card"] = create_fit_card(
         session["outfit_suggestion"], session["selected_item"]
     )
+    trace.step("create_fit_card", inputs = str(session["outfit_suggestion"]), returned = str(session["fit_card"]))
 
     return session
 
