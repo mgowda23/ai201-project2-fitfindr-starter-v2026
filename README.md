@@ -505,24 +505,56 @@ What the service said: The model rejected your API key. Check GEMINI_API_KEY in 
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** One prompt, in `tools.py::create_fit_card`. Nothing else changed: the scenarios, search, loop and temperature (0.9) were all the same. The prompt now says outright that the poster is the buyer. I relabelled the inputs from "Price" / "Platform" to "Price they paid" / "Platform they bought it on", and added one requirement:
 
-**Which failure it was meant to fix:**
+```diff
+  f"Write a real social caption about this thrifted item and outfit.\n"
++ f"The person posting BOUGHT this item. They are the buyer, not the seller.\n"
+  f"Item: {title}\n"
+- f"Price: ${price}\n"
+- f"Platform: {platform}\n"
++ f"Price they paid: ${price}\n"
++ f"Platform they bought it on: {platform}\n"
+  ...
+- "- sound like a real person posting a thrift find\n"
++ "- sound like a real person posting a thrift find they bought\n"
+  "- mention the item, price, and platform once each\n"
++ "- never say or imply they are selling it, listed it, or have a shop; "
++ "no 'grab it', 'link in bio', or 'before I change my mind'\n"
+```
+
+**Which failure it was meant to fix:** Criterion 4 (revised), which MISSED at 4/5. The diagnosis put the problem in the model's output: the prompt never said who the poster was relative to the item, so "item + price + platform" on a resale site sometimes came out as a sales listing ("listed it on Depop for just $18", "Go grab it on my shop before I change my mind").
 
 ### Run Log — After
 
+Full output: [results/run_2026-10-08_1602_after.md](results/run_2026-10-08_1602_after.md), from `python run_eval.py --label after` (cache off, temperature 0.9, 9 scenarios × 5 tries). Scored exactly the same way as the before run.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item is the one the next tools receive | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card names price + platform; no reused opening across items | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4 (revised). Price + platform, user presented as the buyer, all 5 items | 5 of 5 | PASS | PASS | PASS | PASS | PASS | **MET (5/5)**, was MISSED (4/5) |
+| 5. Empty wardrobe still gets styling advice | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Real output, criterion 4 (revised), item A (`lst_002`, the item that failed before), Try 1, from `tools.py::create_fit_card`:
+
+```
+Before: Scored this vintage butterfly baby tee for just $18 on Depop and I'm obsessed with the early 2000s nostalgic vibe. ... Go grab it on my shop before I change my mind and keep it for myself!🦋✨
+After:  Scored this vintage butterfly baby tee on Depop for just $18, and I’m so obsessed. I already planned two ways to style it, ranging from baggy dark-wash denim for classic Y2K street style to sharp khak…
+```
 
 **Did it help, and how do I know:**
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+It fixed the problem it targeted, but it made the captions more repetitive, and I can't fully prove the fix from one run.
+
+- **Seller wording went from 2 of 40 cards to 0 of 40.** Revised criterion 4 went from MISSED (4/5) to MET (5/5), and every card still names the price and the platform (40/40, same as before). Item A, the one that failed before, came back as a buyer's post in all 5 tries.
+- **The evidence is real but thin.** Seller wording only happened in 2 of 40 cards before (5%), so a clean run of 40 is what I'd hope to see if the fix worked, but it isn't proof. If the true rate had stayed at 5%, a run of 40 with zero seller cards would still happen about 13% of the time. Several more runs would be needed to be sure.
+- **Side effect: the captions got more templated.** Before, openings were spread out ("Found" 14, "Still" 9, "Scored" 7, "Score" 6, other 4). After, **36 of 40 cards open with "Scored"**. Telling the model "they bought it" seems to have pulled every caption toward the same buyer verb. "obsessed" went from 27 to 30 of 40, and "for just $" from 35 to 29. The original criterion 4 still passes, because the first sentences differ by item name, which is exactly why I said in Milestone 4 that it measures the wrong thing. Two cards for the same item (`lst_002`) now share an identical first sentence, e.g. "Scored this Y2K butterfly baby tee on Depop for just $18 and I am officially obsessed."
+- **Everything else held.** Criteria 1, 2, 3 and 5 are MET (5/5) in both runs. The prompt change didn't touch the search, the branch or the session.
+
+**About the two runs marked OUTAGE:** my first two attempts at this run happened while Gemini was returning `503 UNAVAILABLE: This model is currently experiencing high demand`. Only 12 and 14 of 40 model tries got through. I kept the first as [results/run_2026-10-08_1358_after_OUTAGE.md](results/run_2026-10-08_1358_after_OUTAGE.md) and deleted the second, which showed the same thing. I didn't score either, because they measure the outage, not the prompt. They were a real-world test of the Milestone 2 handler, though: in the kept file, all 28 failed tries end with "The model couldn't be reached… The search still worked…" and none crashed. I reran once the model answered 6 test calls in a row.
 
 
 
